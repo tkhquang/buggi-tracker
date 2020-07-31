@@ -1,113 +1,99 @@
-import React, { useEffect, useState, useCallback } from "react";
-import { Link, useHistory, useParams } from "react-router-dom";
+import React, { useEffect } from "react";
+import { Link, useHistory } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 
 import { getProjectById, getIssues } from "../helpers/db";
 
-import Loading from "../components/Loading";
+import withLoader from "../components/withLoader";
+import Breadcrumb from "../components/Breadcrumb";
 
-export default function Issues() {
-  const { project_id } = useParams();
-  const history = useHistory();
+const getData = async id => {
+  try {
+    const project = await getProjectById(id);
+    const issues = await getIssues(project.id);
+    issues.sort((a, b) => b.id - a.id);
 
-  const [status, setStatus] = useState("LOADING");
-  const [currentProject, setCurrentProject] = useState(null);
-  const [issues, setIssues] = useState([]);
+    return { project, issues };
+  } catch (error) {
+    Promise.reject(error);
+  }
+};
 
-  const getIssuesFromDB = useCallback(async () => {
-    try {
-      const issueList = await getIssues(project_id);
+export default withLoader(getData, { useParams: true, params: ["project_id"] })(
+  function Issues({ data }) {
+    const { project: currentProject, issues } = data;
+    const history = useHistory();
 
-      issueList.sort((a, b) => b.id - a.id);
+    useEffect(() => {
+      if (!currentProject) {
+        history.push("/projects");
+      }
+    }, [currentProject, history]);
 
-      setIssues(issueList);
-    } catch (error) {
-      console.log(error);
-    }
-  }, [project_id]);
+    return (
+      currentProject && (
+        <>
+          <Helmet>
+            <title>Issues · {currentProject.name}</title>
+          </Helmet>
+          <div className="page issues-page">
+            <Breadcrumb
+              data={[
+                { path: "/", name: "Home" },
+                { path: "/projects", name: "Projects" },
+                {
+                  name: `${currentProject.name} - Issues`
+                }
+              ]}
+            />
 
-  const getCurrentProject = useCallback(async () => {
-    const project = await getProjectById(project_id);
-    if (!project) {
-      history.push("/projects");
-      return;
-    }
-
-    setCurrentProject(project);
-  }, [history, project_id]);
-
-  useEffect(() => {
-    Promise.all([getIssuesFromDB(), getCurrentProject()]).finally(() => {
-      setStatus("IDLE");
-    });
-  }, [getIssuesFromDB, getCurrentProject]);
-
-  return status === "LOADING" ? (
-    <Loading />
-  ) : (
-    <>
-      <div className="page issues-page">
-        <div
-          className="breadcrumb"
-          data-test="breadcrumb"
-          data-test-dir="top-center"
-        >
-          <Link to="/" data-test="bc-1" data-test-dir="top">
-            Home
-          </Link>
-          <span className="breadcrumb__separator">&gt;</span>
-          <Link data-test="bc-2" data-test-dir="top" to="/projects">
-            Projects
-          </Link>
-          <span className="breadcrumb__separator">&gt;</span>
-          <span data-test="bc-3" data-test-dir="top">
-            {currentProject && currentProject.name} - Issues
-          </span>
-        </div>
-        <Link
-          to={`/projects/${project_id}/issues/new`}
-          data-test="add-issue-btn"
-          className="btn btn-primary"
-        >
-          + Add Issue
-        </Link>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Title</th>
-              <th>Author</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {issues.map((issue, index) => (
-              <tr key={issue.id}>
-                <td>
-                  <span data-test={`id-${index + 1}`}>{issue.id}</span>
-                </td>
-                <td>
-                  <Link
-                    to={`/projects/${project_id}/issues/${issue.id}`}
-                    data-test={`title-${index + 1}`}
-                  >
-                    {issue.title}
-                  </Link>
-                </td>
-                <td>
-                  <span data-test={`author-${index + 1}`}>
-                    {issue.owner.username}
-                  </span>
-                </td>
-                <td>
-                  <span data-test={`status-${index + 1}`}>
-                    {issue.open ? "Open" : "Closed"}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
-  );
-}
+            <Link
+              to={`/projects/${currentProject.id}/issues/new`}
+              data-test="add-issue-btn"
+              className="btn btn-primary"
+            >
+              + Add Issue
+            </Link>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Title</th>
+                  <th>Author</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {issues.map((issue, index) => (
+                  <tr key={issue.id}>
+                    <td>
+                      <span data-test={`id-${index + 1}`}>{issue.id}</span>
+                    </td>
+                    <td>
+                      <Link
+                        to={`/projects/${currentProject.id}/issues/${issue.id}`}
+                        data-test={`title-${index + 1}`}
+                      >
+                        {issue.title}
+                      </Link>
+                    </td>
+                    <td>
+                      <span data-test={`author-${index + 1}`}>
+                        {issue.owner.username}
+                      </span>
+                    </td>
+                    <td>
+                      <span data-test={`status-${index + 1}`}>
+                        {issue.open ? "Open" : "Closed"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )
+    );
+  }
+);

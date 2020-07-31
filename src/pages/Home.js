@@ -1,13 +1,17 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 
 export default function Home() {
-  const user = JSON.parse(window.localStorage.getItem("user")) || null;
+  const currentUser = JSON.parse(window.localStorage.getItem("user")) || null;
 
   return (
     <>
+      <Helmet>
+        <title>Home</title>
+      </Helmet>
       <div className="page home-page">
-        {user && user.role === "admin" && (
+        {currentUser.role === "admin" && (
           <Link
             to="/users"
             className="home-page__card"

@@ -37,16 +37,16 @@ export default function DeleteModal({ name, index, callback }) {
                   data-test="yes-btn"
                   className="btn btn-primary"
                   onClick={async () => {
-                    setStatus("LOADING");
+                    setStatus("CALLING");
 
                     try {
                       await callback();
                     } catch (error) {
-                      console.log(error);
                       setStatus("IDLE");
+                      Promise.reject(error);
                     }
                   }}
-                  disabled={status === "LOADING"}
+                  disabled={status === "CALLING"}
                 >
                   Yes
                 </button>
@@ -55,7 +55,7 @@ export default function DeleteModal({ name, index, callback }) {
                   data-test="no-btn"
                   className="btn btn-primary"
                   onClick={() => toggleDeleteModal(false)}
-                  disabled={status === "LOADING"}
+                  disabled={status === "CALLING"}
                 >
                   No
                 </button>

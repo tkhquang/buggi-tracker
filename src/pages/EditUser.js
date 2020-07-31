@@ -1,268 +1,115 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { Link, useHistory, useParams } from "react-router-dom";
+import React, { useEffect, useRef, useState } from "react";
+import { useHistory } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 
 import { updateUser } from "../helpers/auth";
 import { getUsers, getUserById } from "../helpers/db";
 
-import Loading from "../components/Loading";
+import InputText from "../components/InputText";
+import InputSelect from "../components/InputSelect";
+import withLoader from "../components/withLoader";
+import Breadcrumb from "../components/Breadcrumb";
 
-const ERRORS = {
-  USERNAME: {
-    REQUIRED: "Username is required",
-    MAX_LENGTH: "Username can have max 10 characters",
-    ALLOWED_CHARACTERS: "Username can contain only letters and numbers",
-    UNIQUE: "Username is already taken"
-  },
-  ROLE: {
-    REQUIRED: "Role is required"
-  }
-};
+export default withLoader(getUserById, { useParams: true, params: ["id"] })(
+  function EditUser({ data }) {
+    const targetUser = data;
+    const history = useHistory();
+    const [status, setStatus] = useState("IDLE");
+    const usernameRef = useRef(null);
+    const roleRef = useRef(null);
 
-export default function EditUser() {
-  const { id } = useParams();
-  const history = useHistory();
+    const checkIfUsernameTaken = async username => {
+      try {
+        const userList = await getUsers();
 
-  const [currentUser, setCurrentUser] = useState(null);
-  const [input, setInput] = useState({
-    username: {
-      value: "",
-      validating: false,
-      error: ""
-    },
-    role: {
-      value: "",
-      validating: false,
-      error: ""
-    },
-    submit: {
-      status: "IDLE",
-      error: ""
-    }
-  });
-
-  const checkErrors = (name, value) => {
-    value = value || input[name].value;
-
-    if (name === "username") {
-      if (value.trim().length === 0) {
-        return "REQUIRED";
-      }
-
-      if (value.length > 10) {
-        return "MAX_LENGTH";
-      }
-
-      if (!/^[A-Za-z0-9]*$/.test(value)) {
-        return "ALLOWED_CHARACTERS";
-      }
-    }
-
-    if (name === "role") {
-      if (value.trim().length === 0) {
-        return "REQUIRED";
-      }
-    }
-
-    return "";
-  };
-
-  const onInputChange = ({ target: { name, value } }) => {
-    const newInput = { ...input };
-
-    newInput[name].validating = true;
-    newInput[name].value = value;
-    newInput[name].error = checkErrors(name, value);
-
-    setInput(newInput);
-  };
-
-  const handleSubmit = async event => {
-    event.preventDefault();
-
-    const fields = ["username", "role"];
-
-    const newInput = { ...input };
-    newInput["submit"].validating = true;
-    newInput["submit"].error = "";
-
-    let hasErrors = false;
-
-    fields.forEach(field => {
-      let fieldErrors = checkErrors(field);
-
-      if (fieldErrors !== "") {
-        hasErrors = true;
-      }
-
-      newInput[field].validating = true;
-      newInput[field].error = fieldErrors;
-    });
-
-    setInput(newInput);
-
-    if (hasErrors) {
-      return;
-    }
-
-    const username = input.username.value;
-    const role = input.role.value;
-
-    // Nothing has changed
-    if (currentUser.username === username && currentUser.role === role) {
-      history.push("/users");
-      return;
-    }
-
-    try {
-      setInput({
-        ...input,
-        submit: {
-          ...input.submit,
-          status: "LOADING"
-        }
-      });
-
-      const userList = await getUsers();
-
-      // Username already exists
-      if (
-        userList.some(
+        return userList.some(
           item =>
-            item.username.toLowerCase() !==
-              currentUser.username.toLowerCase() &&
+            item.username.toLowerCase() !== targetUser.username.toLowerCase() &&
             item.username.toLowerCase() === username.toLowerCase()
-        )
-      ) {
-        setInput({
-          ...input,
-          username: {
-            ...input.username,
-            error: "UNIQUE"
-          }
-        });
+        );
+      } catch (error) {
+        Promise.reject(error);
+      }
+    };
 
+    const handleSubmit = async event => {
+      event.preventDefault();
+
+      usernameRef.current.setValidating();
+      roleRef.current.setValidating();
+
+      if (usernameRef.current.hasErrors()) {
         return;
       }
 
-      await updateUser(currentUser.id, username, role);
+      if (roleRef.current.hasErrors()) {
+        return;
+      }
 
-      setInput({
-        ...input,
-        submit: {
-          ...input.submit,
-          status: "IDLE"
+      const username = usernameRef.current.getValue();
+      const role = roleRef.current.getValue();
+
+      try {
+        setStatus("CALLING");
+        const isUsernameTaken = await checkIfUsernameTaken(username);
+        if (isUsernameTaken) {
+          usernameRef.current.setError("UNIQUE");
+          setStatus("IDLE");
+          return;
         }
-      });
 
-      history.push("/users");
-    } catch (error) {
-      setInput({
-        ...input,
-        submit: {
-          ...input.submit,
-          error: "AUTHENTICATION",
-          status: "IDLE"
-        }
-      });
-    }
-  };
-
-  const getCurrentUser = useCallback(() => {
-    getUserById(id).then(user => {
-      if (!user) {
+        await updateUser(targetUser.id, username, role);
+        setStatus("IDLE");
         history.push("/users");
-        return;
+      } catch (error) {
+        setStatus("ERROR");
       }
+    };
 
-      setCurrentUser(user);
+    useEffect(() => {
+      if (!targetUser) {
+        history.push("/users");
+      }
+    }, [targetUser, history]);
 
-      setInput(input => ({
-        ...input,
-        username: {
-          ...input.username,
-          value: user.username
-        },
-        role: {
-          ...input.role,
-          value: user.role
-        }
-      }));
-    });
-  }, [history, id]);
-
-  useEffect(() => {
-    getCurrentUser();
-  }, [getCurrentUser]);
-
-  return !currentUser ? (
-    <Loading />
-  ) : (
-    <>
-      <div className="page user-page">
-        <div
-          className="breadcrumb"
-          data-test="breadcrumb"
-          data-test-dir="top-center"
-        >
-          <Link to="/" data-test="bc-1" data-test-dir="top">
-            Home
-          </Link>
-          <span className="breadcrumb__separator">&gt;</span>
-          <Link to="/users" data-test="bc-2" data-test-dir="top">
-            Users
-          </Link>
-          <span className="breadcrumb__separator">&gt;</span>
-          <span data-test="bc-3" data-test-dir="top">
-            Edit User
-          </span>
-        </div>
-        <form className="form" onSubmit={handleSubmit}>
-          <div className="textbox" data-test="username">
-            <label htmlFor="username">Username</label>
-            <input
-              id="username"
-              name="username"
-              type="text"
-              onChange={onInputChange}
-              value={input.username.value}
+    return (
+      <>
+        <Helmet>
+          <title>Edit User · {targetUser.username}</title>
+        </Helmet>
+        <div className="page user-page">
+          <Breadcrumb
+            data={[
+              { path: "/", name: "Home" },
+              { path: "/users", name: "Users" },
+              { name: "Edit User" }
+            ]}
+          />
+          <form className="form" onSubmit={handleSubmit}>
+            <InputText
+              ref={usernameRef}
+              name="Username"
+              rules={["REQUIRED", "MAX_LENGTH", "ALLOWED_CHARACTERS"]}
+              defaultValue={targetUser.username}
             />
-            {input.username.validating && input.username.error !== "" && (
-              <div data-test="error" className="error">
-                {ERRORS.USERNAME[input.username.error]}
-              </div>
-            )}
-          </div>
-          <div className="select" data-test="role">
-            <label htmlFor="role">Role</label>
-            <select
-              id="role"
-              name="role"
-              value={input.role.value}
-              onChange={onInputChange}
+            <InputSelect
+              ref={roleRef}
+              name="Role"
+              options={["admin", "owner", "reporter"]}
+              rules={["REQUIRED"]}
+              defaultValue={targetUser.role}
+            />
+            <button
+              className="btn btn-primary"
+              data-test="save-btn"
+              type="submit"
+              disabled={status === "CALLING"}
             >
-              <option value="" disabled>
-                select
-              </option>
-              <option value="admin">admin</option>
-              <option value="owner">owner</option>
-              <option value="reporter">reporter</option>
-            </select>
-            {input.role.validating && input.role.error !== "" && (
-              <div data-test="error" className="error">
-                {ERRORS.ROLE[input.role.error]}
-              </div>
-            )}
-          </div>
-          <button
-            className="btn btn-primary"
-            data-test="save-btn"
-            type="submit"
-            disabled={input.submit.status === "LOADING"}
-          >
-            Save
-          </button>
-        </form>
-      </div>
-    </>
-  );
-}
+              Save
+            </button>
+          </form>
+        </div>
+      </>
+    );
+  }
+);

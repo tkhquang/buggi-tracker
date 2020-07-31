@@ -2,7 +2,7 @@ import React from "react";
 import { signout } from "../helpers/auth";
 
 export default function Header() {
-  const user = JSON.parse(window.localStorage.getItem("user")) || null;
+  const currentUser = JSON.parse(window.localStorage.getItem("user")) || null;
 
   return (
     <div className="header">
@@ -12,7 +12,7 @@ export default function Header() {
         data-test="header-username"
         className="header__username"
       >
-        Hello {user && user.email.replace("@tkhquang.dev", "")}
+        Hello {currentUser && currentUser.username}
       </div>
       <button
         data-test="logout-btn"

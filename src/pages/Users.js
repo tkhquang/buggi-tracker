@@ -1,61 +1,44 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 
 import { getUsers } from "../helpers/db";
 import { deleteUser } from "../helpers/auth";
 
-import Loading from "../components/Loading";
+import withLoader from "../components/withLoader";
+import InPageLoader from "../components/InPageLoader";
 import DeleteModal from "../components/DeleteModal";
+import Breadcrumb from "../components/Breadcrumb";
 
-export default function Users() {
+export default withLoader(getUsers)(function Users({ data }) {
+  const [users, setUsers] = useState(data);
   const currentUser = JSON.parse(window.localStorage.getItem("user")) || null;
-
-  const [status, setStatus] = useState("LOADING");
-  const [users, setUsers] = useState([]);
-
-  const getUsersFromDB = async () => {
-    try {
-      const userList = await getUsers();
-
-      setUsers(userList);
-    } catch (error) {
-      console.log(error);
-    } finally {
-      setStatus("IDLE");
-    }
-  };
+  const [status, setStatus] = useState("IDLE");
 
   const deleteCallback = async id => {
     try {
       await deleteUser(id);
-      await getUsersFromDB();
+
+      setStatus("CALLING");
+      const userList = await getUsers();
+      setUsers(userList);
+
+      setStatus("IDLE");
     } catch (error) {
-      console.log(error);
+      setStatus("ERROR");
+      Promise.reject(error);
     }
   };
 
-  useEffect(() => {
-    getUsersFromDB();
-  }, []);
-
-  return status === "LOADING" ? (
-    <Loading />
+  return status === "CALLING" ? (
+    <InPageLoader />
   ) : (
     <>
+      <Helmet>
+        <title>User Management</title>
+      </Helmet>
       <div className="page users-page">
-        <div
-          className="breadcrumb"
-          data-test="breadcrumb"
-          data-test-dir="top-center"
-        >
-          <Link to="/" data-test="bc-1" data-test-dir="top">
-            Home
-          </Link>
-          <span className="breadcrumb__separator">&gt;</span>
-          <span data-test="bc-2" data-test-dir="top">
-            Users
-          </span>
-        </div>
+        <Breadcrumb data={[{ path: "/", name: "Home" }, { name: "Users" }]} />
         <Link
           to="/users/new"
           data-test="add-user-btn"
@@ -89,7 +72,7 @@ export default function Users() {
                         name={user.username}
                         index={index + 1}
                         callback={() => deleteCallback(user.id)}
-                      />
+                      />{" "}
                       |{" "}
                       <Link
                         to={`/users/${user.id}`}
@@ -107,4 +90,4 @@ export default function Users() {
       </div>
     </>
   );
-}
+});

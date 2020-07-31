@@ -1,5 +1,3 @@
-import { functions } from "../services/firebase";
-
 // Auth Role Object / Enum
 const ROLES = {
   admin: {
