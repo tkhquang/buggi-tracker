@@ -48,7 +48,7 @@ function App() {
   ) : (
     <>
       <Helmet titleTemplate="%s | Buggi Tracker" />
-      <Header />
+      {authenticated && <Header />}
       <Routes authenticated={authenticated} />
     </>
   );
