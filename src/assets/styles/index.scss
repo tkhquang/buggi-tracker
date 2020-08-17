@@ -181,7 +181,9 @@ a {
 
 /* Header */
 .header {
+  min-width: 100%;
   display: flex;
+  justify-content: space-between;
   align-items: center;
   padding: 10px 15px;
   border-bottom: 1px solid #ccc;
@@ -189,14 +191,14 @@ a {
 
 .header__title {
   margin: 0;
-  padding-left: 100px;
 }
 
 .header__username {
   margin-left: auto;
   display: flex;
+  white-space: nowrap;
   align-items: center;
-  margin-right: 10px;
+  padding: 0 10px;
 }
 
 /* Homepage */
@@ -307,6 +309,7 @@ a {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  min-width: 100%;
 }
 
 .page {
